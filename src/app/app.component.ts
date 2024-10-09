@@ -39,7 +39,7 @@ export class AppComponent implements OnInit {
         // Agregar un marcador en la ubicación actual
         this.map.on('load', () => {
           this.addMarker(this.currentPosition, 'Marker 1'); // Marcador 1
-          this.addMarker([-76.49681942762918,3.478120048244367], 'Marcador 2 de prueba, aca pondría información del sitio'); // Marcador 1
+          this.addMarker([-76.49681942762918,3.478120048244367], 'Marcador 2 de prueba, acá pondría información del sitio');
         });
       }, (error) => {
         console.error('Error al obtener la geolocalización', error);
@@ -50,11 +50,14 @@ export class AppComponent implements OnInit {
   }
 
   addMarker(coordinates: [number, number], title: string): void {
+    // Agregarun marcador personalizado
     /* const markerElement = document.createElement('div');
     markerElement.className = 'my-marker'; // Clase CSS personalizada
     markerElement.style.backgroundImage = 'url(path_to_your_icon.png)';
     markerElement.style.width = '30px'; // Ancho del ícono
     markerElement.style.height = '30px'; // Alto del ícono */
+    // const marker = new mapboxgl.Marker(markerElement) <--- se agrega al marcador 
+
     // Crear un nuevo marcador
     const marker = new mapboxgl.Marker()
       .setLngLat(coordinates) // Establecer la ubicación del marcador
