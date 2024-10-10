@@ -11,49 +11,40 @@ import { Ciudad, Municipio, Parquimetro } from './utils/interfaces';
   styleUrls: ['./app.component.css']
 })
 export class AppComponent implements OnInit {
-  map!: mapboxgl.Map; // Declaramos el mapa como propiedad
+  map!: mapboxgl.Map;
   geocoder!: MapboxGeocoder;
-  currentPosition: [number, number] = [0, 0]; // Para almacenar la posición actual
+  currentPosition: [number, number] = [0, 0];
   previousPosition: [number, number] | null = null; 
-  userMarkerElement: mapboxgl.Marker | null = null; // Para almacenar el marcador del usuario
+  userMarkerElement: mapboxgl.Marker | null = null;
 
-  selectedMunicipioId: number | null = null; // No seleccionamos ningún municipio al inicio
-  selectedCiudadId: number | null = null; // No seleccionamos ninguna ciudad al inicio
+  selectedMunicipioId: number | null = null; 
+  selectedCiudadId: number | null = null; 
   filteredCiudades: Ciudad[] = [];
-  isCiudadSelectDisabled: boolean = true; // El select de ciudades está deshabilitado inicialmente
+  isCiudadSelectDisabled: boolean = true;
 
   ciudades_component: Ciudad[] = ciudades;
   municipios_component: Municipio[] = municipios;
   parquimetros_component: Parquimetro[] = parquimetros;
 
-  // Caché para almacenar ciudades consultadas
-  cityCache: { [key: string]: string } = {};
-
   ngOnInit(): void {
     this.filterCiudades();
 
-    // Intentar obtener la ubicación del usuario
     if (navigator.geolocation) {
       navigator.geolocation.watchPosition(
         (position) => {
           const newPosition: [number, number] = [position.coords.longitude, position.coords.latitude];
           this.currentPosition = newPosition;
 
-          // Solo ejecutar la promesa si las coordenadas han cambiado
-          if (!this.previousPosition || (this.previousPosition[0] !== newPosition[0] || this.previousPosition[1] !== newPosition[1])) {
-            const positionKey = `${newPosition[0]},${newPosition[1]}`; // Crear una clave única para las coordenadas
+          // Solo ejecutar la promesa si las coordenadas han cambiado significativamente
+          if (!this.previousPosition || 
+              this.previousPosition[0] !== newPosition[0] || 
+              this.previousPosition[1] !== newPosition[1]) {
             
-            // Verificar si la ciudad ya está en caché
-            if (!this.cityCache[positionKey]) {
-              this.getCityFromCoordinates(this.currentPosition).then(city => {
-                if (city) {
-                  this.cityCache[positionKey] = city; // Guardar en caché
-                  console.log(`Te encuentras en: ${city}`);
-                }
-              });
-            } else {
-              console.log(`Te encuentras en: ${this.cityCache[positionKey]}`); // Usar caché
-            }
+            this.getCityFromCoordinates(this.currentPosition).then(city => {
+              if (city) {
+                console.log(`Te encuentras en: ${city}`);
+              }
+            });
 
             // Actualizar la posición anterior
             this.previousPosition = this.currentPosition;
@@ -62,39 +53,33 @@ export class AppComponent implements OnInit {
           // Inicializar el mapa de Mapbox en la ubicación del usuario
           if (!this.map) {
             this.map = new mapboxgl.Map({
-              accessToken: environment.mapboxAccessToken, // Token de Mapbox
-              container: 'mapbox', // ID del contenedor
-              style: 'mapbox://styles/mapbox/streets-v11', // Estilo del mapa
-              center: this.currentPosition, // Centrar el mapa en la ubicación actual
-              zoom: 17 // Nivel de zoom
+              accessToken: environment.mapboxAccessToken,
+              container: 'mapbox',
+              style: 'mapbox://styles/mapbox/streets-v11',
+              center: this.currentPosition,
+              zoom: 17
             });
 
-            // Inicializar el Geocoder
             this.geocoder = new MapboxGeocoder({
               accessToken: environment.mapboxAccessToken,
-              mapboxgl: mapboxgl, // Vincular con el mapa
+              mapboxgl: mapboxgl,
               placeholder: 'Buscar una ubicación',
-              proximity: { longitude: -74.5, latitude: 40 } // Opcional, para buscar cerca de una ubicación específica
+              proximity: { longitude: -74.5, latitude: 40 }
             });
 
-            // Añadir el Geocoder al mapa
             this.map.addControl(this.geocoder);
-
-            // Escuchar eventos de búsqueda del Geocoder
             this.geocoder.on('result', (e: any) => {
               const { center } = e.result;
               this.map.flyTo({ center, zoom: 16 });
             });
 
-            // Agregar los marcadores iniciales (incluyendo el usuario)
             this.map.on('load', () => {
-              this.userMarker(this.currentPosition); // Marcador del usuario
+              this.userMarker(this.currentPosition);
               this.parquimetros_component.map(parquimetro =>
                 this.addMarker(parquimetro.coordenada, parquimetro.description)
               );
             });
           } else {
-            // Actualizar la ubicación del marcador del usuario
             this.userMarker(this.currentPosition);
           }
         },
@@ -102,9 +87,9 @@ export class AppComponent implements OnInit {
           console.error('Error al obtener la geolocalización', error);
         },
         {
-          enableHighAccuracy: true, // Para mayor precisión
-          maximumAge: 0, // No cachear la posición
-          timeout: 10000 // Tiempo máximo de espera
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 10000
         }
       );
     } else {
@@ -113,31 +98,27 @@ export class AppComponent implements OnInit {
   }
 
   addMarker(coordinates: [number, number], title: string): void {
-    // Crear un nuevo marcador
     const marker = new mapboxgl.Marker()
-      .setLngLat(coordinates) // Establecer la ubicación del marcador
-      .setPopup(new mapboxgl.Popup().setText(title)) // Agregar un popup con el título
-      .addTo(this.map); // Añadir el marcador al mapa
+      .setLngLat(coordinates)
+      .setPopup(new mapboxgl.Popup().setText(title))
+      .addTo(this.map);
   }
 
   userMarker(coordinates: [number, number]): void {
-    // Crear o reutilizar el marcador del usuario con estilos personalizados
     const markerElement = document.createElement('div');
-    markerElement.className = 'my-marker'; // Clase CSS personalizada
-    markerElement.style.backgroundImage = "url('assets/custom_marker.svg')"; // Ruta desde 'assets'
-    markerElement.style.width = '50px'; // Ancho del ícono
-    markerElement.style.height = '50px'; // Alto del ícono 
-    markerElement.style.backgroundSize = 'contain'; // Asegurar que la imagen cubra todo el div
+    markerElement.className = 'my-marker';
+    markerElement.style.backgroundImage = "url('assets/custom_marker.svg')";
+    markerElement.style.width = '50px';
+    markerElement.style.height = '50px'; 
+    markerElement.style.backgroundSize = 'contain';
     markerElement.style.backgroundRepeat = 'no-repeat';
 
     if (this.userMarkerElement) {
-      // Si el marcador ya existe, simplemente actualizamos la posición
       this.userMarkerElement.setLngLat(coordinates);
     } else {
-      // Si no existe, creamos uno nuevo con los estilos personalizados
       this.userMarkerElement = new mapboxgl.Marker(markerElement)
-        .setLngLat(coordinates) // Establecer la ubicación del marcador
-        .addTo(this.map); // Añadir el marcador al mapa
+        .setLngLat(coordinates)
+        .addTo(this.map);
     }
   }
 
@@ -150,9 +131,8 @@ export class AppComponent implements OnInit {
     if (municipioId) {
       this.selectedMunicipioId = municipioId;
       this.filteredCiudades = this.ciudades_component.filter(c => c.municipio_id === municipioId);
-      this.isCiudadSelectDisabled = false; // Habilitar el select de ciudades
+      this.isCiudadSelectDisabled = false;
     } else {
-      // Si no selecciona nada (opción "Selecciona una opción"), deshabilitamos el select de ciudades
       this.filteredCiudades = [];
       this.isCiudadSelectDisabled = true;
       this.selectedCiudadId = null;
@@ -164,7 +144,7 @@ export class AppComponent implements OnInit {
     this.selectedCiudadId = ciudadId;
     const selectedCiudad = this.ciudades_component.find(c => c.id === ciudadId);
     if (selectedCiudad) {
-      this.moveToCoordinates(selectedCiudad.coordenada); // Mover el mapa a las coordenadas de la ciudad
+      this.moveToCoordinates(selectedCiudad.coordenada);
     }
   }
 
@@ -174,8 +154,8 @@ export class AppComponent implements OnInit {
 
   moveToCoordinates(coordinates: [number, number], zoomMap = 11) {
     this.map.flyTo({
-      center: coordinates, // Coordenadas a las que se moverá el mapa
-      zoom: zoomMap // Zoom al que se acercará
+      center: coordinates,
+      zoom: zoomMap
     });
   }
 
@@ -188,9 +168,9 @@ export class AppComponent implements OnInit {
         throw new Error('Network response was not ok');
       }
       const data = await response.json();
-      const place = data.features[0]; // Obtén el primer resultado
+      const place = data.features[0];
       if (place) {
-        const city = place.context.find((c: { id: string | string[]; }) => c.id.includes('place')); // Filtrar para encontrar la ciudad
+        const city = place.context.find((c: { id: string | string[]; }) => c.id.includes('place'));
         if (city) {
           return city.text; // Retorna el nombre de la ciudad
         }
