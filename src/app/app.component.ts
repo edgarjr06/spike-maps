@@ -14,6 +14,7 @@ export class AppComponent implements OnInit {
   map!: mapboxgl.Map; // Declaramos el mapa como propiedad
   geocoder!: MapboxGeocoder;
   currentPosition: [number, number] = [0, 0]; // Para almacenar la posición actual
+  previousPosition: [number, number] | null = null; 
   userMarkerElement: mapboxgl.Marker | null = null; // Para almacenar el marcador del usuario
 
   selectedMunicipioId: number | null = null; // No seleccionamos ningún municipio al inicio
@@ -33,12 +34,20 @@ export class AppComponent implements OnInit {
       navigator.geolocation.watchPosition(
         (position) => {
           // Actualizar latitud y longitud del usuario
-          this.currentPosition = [position.coords.longitude, position.coords.latitude];
+          const newPosition: [number, number] = [position.coords.longitude, position.coords.latitude];
+          
+          // Actualizar siempre la posición actual
+          this.currentPosition = newPosition;
 
-           // Obtener la ciudad a partir de las coordenadas
+           // Solo ejecutar la promesa si las coordenadas han cambiado
+          if (!this.previousPosition || (this.previousPosition[0] !== newPosition[0] || this.previousPosition[1] !== newPosition[1])) {
             this.getCityFromCoordinates(this.currentPosition).then(city => {
               console.log(`Te encuentras en: ${city}`);
             });
+
+            // Actualizar la posición anterior
+            this.previousPosition = this.currentPosition;
+          }
 
 
           // Inicializar el mapa de Mapbox en la ubicación del usuario
