@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import * as mapboxgl from 'mapbox-gl';
+import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder';
 import { environment } from '../environments/environment';
 import { ciudades, municipios, parquimetros } from './utils/parkimeters-response';
 import { Ciudad, Municipio, Parquimetro } from './utils/interfaces';
@@ -11,13 +12,14 @@ import { Ciudad, Municipio, Parquimetro } from './utils/interfaces';
 })
 export class AppComponent implements OnInit {
   map!: mapboxgl.Map; // Declaramos el mapa como propiedad
+  geocoder!: MapboxGeocoder;
   currentPosition: [number, number] = [0, 0]; // Para almacenar la posición actual
+  userMarkerElement: mapboxgl.Marker | null = null; // Para almacenar el marcador del usuario
 
   selectedMunicipioId: number | null = null; // No seleccionamos ningún municipio al inicio
   selectedCiudadId: number | null = null; // No seleccionamos ninguna ciudad al inicio
   filteredCiudades: Ciudad[] = [];
   isCiudadSelectDisabled: boolean = true; // El select de ciudades está deshabilitado inicialmente
-
 
   ciudades_component: Ciudad[] = ciudades;
   municipios_component: Municipio[] = municipios;
@@ -28,29 +30,65 @@ export class AppComponent implements OnInit {
 
     // Intentar obtener la ubicación del usuario
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) => {
-        // Obtener latitud y longitud del usuario
-        this.currentPosition = [position.coords.longitude, position.coords.latitude];
-        
-        // Inicializar el mapa de Mapbox en la ubicación del usuario
-        this.map = new mapboxgl.Map({
-          accessToken: environment.mapboxAccessToken, // Token de Mapbox
-          container: 'mapbox', // ID del contenedor
-          style: 'mapbox://styles/mapbox/streets-v11', // Estilo del mapa
-          center: this.currentPosition, // Centrar el mapa en la ubicación actual
-          zoom: 17 // Nivel de zoom
-        });
-        console.log(this.currentPosition)
-        // Agregar un marcador en la ubicación actual
-        this.map.on('load', () => {
-          this.userMarker(this.currentPosition); // Marcador 1
-          this.parquimetros_component.map(parquimetro => (
-            this.addMarker(parquimetro.coordenada, parquimetro.description)
-          ))
-        });
-      }, (error) => {
-        console.error('Error al obtener la geolocalización', error);
-      });
+      navigator.geolocation.watchPosition(
+        (position) => {
+          // Actualizar latitud y longitud del usuario
+          this.currentPosition = [position.coords.longitude, position.coords.latitude];
+
+           // Obtener la ciudad a partir de las coordenadas
+            this.getCityFromCoordinates(this.currentPosition).then(city => {
+              console.log(`Te encuentras en: ${city}`);
+            });
+
+
+          // Inicializar el mapa de Mapbox en la ubicación del usuario
+          if (!this.map) {
+            this.map = new mapboxgl.Map({
+              accessToken: environment.mapboxAccessToken, // Token de Mapbox
+              container: 'mapbox', // ID del contenedor
+              style: 'mapbox://styles/mapbox/streets-v11', // Estilo del mapa
+              center: this.currentPosition, // Centrar el mapa en la ubicación actual
+              zoom: 17 // Nivel de zoom
+            });
+
+            // Inicializar el Geocoder
+            this.geocoder = new MapboxGeocoder({
+              accessToken: environment.mapboxAccessToken,
+              mapboxgl: mapboxgl, // Vincular con el mapa
+              placeholder: 'Buscar una ubicación',
+              proximity: { longitude: -74.5, latitude: 40 } // Opcional, para buscar cerca de una ubicación específica
+            });
+
+            // Añadir el Geocoder al mapa
+            this.map.addControl(this.geocoder);
+
+            // Escuchar eventos de búsqueda del Geocoder
+            this.geocoder.on('result', (e: any) => {
+              const { center } = e.result;
+              this.map.flyTo({ center, zoom: 16 });
+            });
+
+            // Agregar los marcadores iniciales (incluyendo el usuario)
+            this.map.on('load', () => {
+              this.userMarker(this.currentPosition); // Marcador del usuario
+              this.parquimetros_component.map(parquimetro =>
+                this.addMarker(parquimetro.coordenada, parquimetro.description)
+              );
+            });
+          } else {
+            // Actualizar la ubicación del marcador del usuario
+            this.userMarker(this.currentPosition);
+          }
+        },
+        (error) => {
+          console.error('Error al obtener la geolocalización', error);
+        },
+        {
+          enableHighAccuracy: true, // Para mayor precisión
+          maximumAge: 0, // No cachear la posición
+          timeout: 10000 // Tiempo máximo de espera
+        }
+      );
     } else {
       console.error('Geolocalización no es soportada por este navegador.');
     }
@@ -65,7 +103,7 @@ export class AppComponent implements OnInit {
   }
 
   userMarker(coordinates: [number, number]): void {
-    // Crear un marcador personalizado
+    // Crear o reutilizar el marcador del usuario con estilos personalizados
     const markerElement = document.createElement('div');
     markerElement.className = 'my-marker'; // Clase CSS personalizada
     markerElement.style.backgroundImage = "url('assets/custom_marker.svg')"; // Ruta desde 'assets'
@@ -73,11 +111,16 @@ export class AppComponent implements OnInit {
     markerElement.style.height = '50px'; // Alto del ícono 
     markerElement.style.backgroundSize = 'contain'; // Asegurar que la imagen cubra todo el div
     markerElement.style.backgroundRepeat = 'no-repeat';
-    
-    // Crear un nuevo marcador
-    const marker = new mapboxgl.Marker(markerElement)
-      .setLngLat(coordinates) // Establecer la ubicación del marcador
-      .addTo(this.map); // Añadir el marcador al mapa
+
+    if (this.userMarkerElement) {
+      // Si el marcador ya existe, simplemente actualizamos la posición
+      this.userMarkerElement.setLngLat(coordinates);
+    } else {
+      // Si no existe, creamos uno nuevo con los estilos personalizados
+      this.userMarkerElement = new mapboxgl.Marker(markerElement)
+        .setLngLat(coordinates) // Establecer la ubicación del marcador
+        .addTo(this.map); // Añadir el marcador al mapa
+    }
   }
 
   filterCiudades() {
@@ -118,4 +161,26 @@ export class AppComponent implements OnInit {
     });
   }
 
+  async getCityFromCoordinates(coordinates: [number, number]) {
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coordinates[0]},${coordinates[1]}.json?access_token=${environment.mapboxAccessToken}`;
+  
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const data = await response.json();
+      const place = data.features[0]; // Obtén el primer resultado
+      if (place) {
+        const city = place.context.find((c: { id: string | string[]; }) => c.id.includes('place')); // Filtrar para encontrar la ciudad
+        if (city) {
+          return city.text; // Retorna el nombre de la ciudad
+        }
+      }
+    } catch (error) {
+      console.error('Error al obtener la ciudad:', error);
+    }
+    return null; // Retorna null si no se encontró la ciudad
+  }
+  
 }
