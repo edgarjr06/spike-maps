@@ -26,6 +26,9 @@ export class AppComponent implements OnInit {
   municipios_component: Municipio[] = municipios;
   parquimetros_component: Parquimetro[] = parquimetros;
 
+  // Caché para almacenar ciudades consultadas
+  cityCache: { [key: string]: string } = {};
+
   ngOnInit(): void {
     this.filterCiudades();
 
@@ -33,22 +36,28 @@ export class AppComponent implements OnInit {
     if (navigator.geolocation) {
       navigator.geolocation.watchPosition(
         (position) => {
-          // Actualizar latitud y longitud del usuario
           const newPosition: [number, number] = [position.coords.longitude, position.coords.latitude];
-          
-          // Actualizar siempre la posición actual
           this.currentPosition = newPosition;
 
-           // Solo ejecutar la promesa si las coordenadas han cambiado
+          // Solo ejecutar la promesa si las coordenadas han cambiado
           if (!this.previousPosition || (this.previousPosition[0] !== newPosition[0] || this.previousPosition[1] !== newPosition[1])) {
-            this.getCityFromCoordinates(this.currentPosition).then(city => {
-              console.log(`Te encuentras en: ${city}`);
-            });
+            const positionKey = `${newPosition[0]},${newPosition[1]}`; // Crear una clave única para las coordenadas
+            
+            // Verificar si la ciudad ya está en caché
+            if (!this.cityCache[positionKey]) {
+              this.getCityFromCoordinates(this.currentPosition).then(city => {
+                if (city) {
+                  this.cityCache[positionKey] = city; // Guardar en caché
+                  console.log(`Te encuentras en: ${city}`);
+                }
+              });
+            } else {
+              console.log(`Te encuentras en: ${this.cityCache[positionKey]}`); // Usar caché
+            }
 
             // Actualizar la posición anterior
             this.previousPosition = this.currentPosition;
           }
-
 
           // Inicializar el mapa de Mapbox en la ubicación del usuario
           if (!this.map) {
@@ -191,5 +200,4 @@ export class AppComponent implements OnInit {
     }
     return null; // Retorna null si no se encontró la ciudad
   }
-  
 }
