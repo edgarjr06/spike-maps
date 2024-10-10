@@ -13,8 +13,11 @@ export class AppComponent implements OnInit {
   map!: mapboxgl.Map; // Declaramos el mapa como propiedad
   currentPosition: [number, number] = [0, 0]; // Para almacenar la posición actual
 
-  selectedMunicipioId: number = 1; // Por defecto, seleccionamos el primer municipio
+  selectedMunicipioId: number | null = null; // No seleccionamos ningún municipio al inicio
+  selectedCiudadId: number | null = null; // No seleccionamos ninguna ciudad al inicio
   filteredCiudades: Ciudad[] = [];
+  isCiudadSelectDisabled: boolean = true; // El select de ciudades está deshabilitado inicialmente
+
 
   ciudades_component: Ciudad[] = ciudades;
   municipios_component: Municipio[] = municipios;
@@ -82,8 +85,37 @@ export class AppComponent implements OnInit {
   }
 
   onMunicipioChange(event: any) {
-    this.selectedMunicipioId = +event.target.value;
-    this.filterCiudades();
+    const municipioId = +event.target.value;
+    if (municipioId) {
+      this.selectedMunicipioId = municipioId;
+      this.filteredCiudades = this.ciudades_component.filter(c => c.municipio_id === municipioId);
+      this.isCiudadSelectDisabled = false; // Habilitar el select de ciudades
+    } else {
+      // Si no selecciona nada (opción "Selecciona una opción"), deshabilitamos el select de ciudades
+      this.filteredCiudades = [];
+      this.isCiudadSelectDisabled = true;
+      this.selectedCiudadId = null;
+    }
+  }
+
+  onCiudadChange(event: any) {
+    const ciudadId = +event.target.value;
+    this.selectedCiudadId = ciudadId;
+    const selectedCiudad = this.ciudades_component.find(c => c.id === ciudadId);
+    if (selectedCiudad) {
+      this.moveToCoordinates(selectedCiudad.coordenada); // Mover el mapa a las coordenadas de la ciudad
+    }
+  }
+
+  onBackToCurrentPosition() {
+    this.moveToCoordinates(this.currentPosition, 17);
+  }
+
+  moveToCoordinates(coordinates: [number, number], zoomMap = 11) {
+    this.map.flyTo({
+      center: coordinates, // Coordenadas a las que se moverá el mapa
+      zoom: zoomMap // Zoom al que se acercará
+    });
   }
 
 }
