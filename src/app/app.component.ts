@@ -1,6 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import * as mapboxgl from 'mapbox-gl';
 import { environment } from '../environments/environment';
+import { ciudades, municipios, parquimetros } from './utils/parkimeters-response';
+import { Ciudad, Municipio, Parquimetro } from './utils/interfaces';
 
 @Component({
   selector: 'app-root',
@@ -8,12 +10,18 @@ import { environment } from '../environments/environment';
   styleUrls: ['./app.component.css']
 })
 export class AppComponent implements OnInit {
-  // googleCenter: google.maps.LatLngLiteral = { lat: 40.730610, lng: -73.935242 };
   map!: mapboxgl.Map; // Declaramos el mapa como propiedad
   currentPosition: [number, number] = [0, 0]; // Para almacenar la posición actual
 
+  selectedMunicipioId: number = 1; // Por defecto, seleccionamos el primer municipio
+  filteredCiudades: Ciudad[] = [];
+
+  ciudades_component: Ciudad[] = ciudades;
+  municipios_component: Municipio[] = municipios;
+  parquimetros_component: Parquimetro[] = parquimetros;
+
   ngOnInit(): void {
-    // this.loadGoogleMaps(); // Cargar Google Maps API
+    this.filterCiudades();
 
     // Intentar obtener la ubicación del usuario
     if (navigator.geolocation) {
@@ -21,25 +29,21 @@ export class AppComponent implements OnInit {
         // Obtener latitud y longitud del usuario
         this.currentPosition = [position.coords.longitude, position.coords.latitude];
         
-        // Actualizar el centro de Google Maps con la ubicación actual
-        /* this.googleCenter = { 
-          lat: position.coords.latitude, 
-          lng: position.coords.longitude 
-        }; */
-
         // Inicializar el mapa de Mapbox en la ubicación del usuario
         this.map = new mapboxgl.Map({
           accessToken: environment.mapboxAccessToken, // Token de Mapbox
           container: 'mapbox', // ID del contenedor
           style: 'mapbox://styles/mapbox/streets-v11', // Estilo del mapa
           center: this.currentPosition, // Centrar el mapa en la ubicación actual
-          zoom: 14 // Nivel de zoom
+          zoom: 17 // Nivel de zoom
         });
         console.log(this.currentPosition)
         // Agregar un marcador en la ubicación actual
         this.map.on('load', () => {
-          this.addMarker(this.currentPosition, 'Marker 1'); // Marcador 1
-          this.addMarker([-76.49681942762918,3.478120048244367], 'Marcador 2 de prueba, acá pondría información del sitio');
+          this.userMarker(this.currentPosition); // Marcador 1
+          this.parquimetros_component.map(parquimetro => (
+            this.addMarker(parquimetro.coordenada, parquimetro.description)
+          ))
         });
       }, (error) => {
         console.error('Error al obtener la geolocalización', error);
@@ -50,14 +54,6 @@ export class AppComponent implements OnInit {
   }
 
   addMarker(coordinates: [number, number], title: string): void {
-    // Agregarun marcador personalizado
-    /* const markerElement = document.createElement('div');
-    markerElement.className = 'my-marker'; // Clase CSS personalizada
-    markerElement.style.backgroundImage = 'url(path_to_your_icon.png)';
-    markerElement.style.width = '30px'; // Ancho del ícono
-    markerElement.style.height = '30px'; // Alto del ícono */
-    // const marker = new mapboxgl.Marker(markerElement) <--- se agrega al marcador 
-
     // Crear un nuevo marcador
     const marker = new mapboxgl.Marker()
       .setLngLat(coordinates) // Establecer la ubicación del marcador
@@ -65,12 +61,29 @@ export class AppComponent implements OnInit {
       .addTo(this.map); // Añadir el marcador al mapa
   }
 
-  // Método para cargar Google Maps
- /*  loadGoogleMaps() {
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${environment.googleMapsApiKey}`;
-    script.async = true;
-    script.defer = true;
-    document.body.appendChild(script);
-  } */
+  userMarker(coordinates: [number, number]): void {
+    // Crear un marcador personalizado
+    const markerElement = document.createElement('div');
+    markerElement.className = 'my-marker'; // Clase CSS personalizada
+    markerElement.style.backgroundImage = "url('assets/custom_marker.svg')"; // Ruta desde 'assets'
+    markerElement.style.width = '50px'; // Ancho del ícono
+    markerElement.style.height = '50px'; // Alto del ícono 
+    markerElement.style.backgroundSize = 'contain'; // Asegurar que la imagen cubra todo el div
+    markerElement.style.backgroundRepeat = 'no-repeat';
+    
+    // Crear un nuevo marcador
+    const marker = new mapboxgl.Marker(markerElement)
+      .setLngLat(coordinates) // Establecer la ubicación del marcador
+      .addTo(this.map); // Añadir el marcador al mapa
+  }
+
+  filterCiudades() {
+    this.filteredCiudades = this.ciudades_component.filter(c => c.municipio_id === this.selectedMunicipioId);
+  }
+
+  onMunicipioChange(event: any) {
+    this.selectedMunicipioId = +event.target.value;
+    this.filterCiudades();
+  }
+
 }

@@ -1,9 +1,23 @@
 <div style="display: flex; justify-content: space-between;">
-  <!-- Contenedor de Google Maps -->
- <!--  <div style="width: 48%; height: 500px;">
-    <google-map [center]="googleCenter" [zoom]="12"></google-map>
-  </div> -->
+  <!-- Select para Municipios -->
+  <div>
+    <label for="municipioSelect">Selecciona un municipio:</label>
+    <select id="municipioSelect" (change)="onMunicipioChange($event)">
+      <option *ngFor="let municipio of municipios_component" [value]="municipio.id">
+        {{ municipio.name }}
+      </option>
+    </select>
+  </div>
 
+  <!-- Select para Ciudades -->
+  <div>
+    <label for="ciudadSelect">Selecciona una ciudad:</label>
+    <select id="ciudadSelect">
+      <option *ngFor="let ciudad of filteredCiudades" [value]="ciudad.id">
+        {{ ciudad.name }}
+      </option>
+    </select>
+  </div>
   <!-- Contenedor de Mapbox -->
-  <div id="mapbox" style="width: 48%; height: 500px;"></div>
+  <div id="mapbox" style="width: 100%; height: 500px;"></div>
 </div>
